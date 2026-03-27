@@ -12,22 +12,24 @@ Double buffering to overlap computation and data transfer, reducing idle cycles
 Parameterizable design for scalability across different array sizes and bit-widths
 AXI-based memory interfacing for integration with processing systems (PS)
 
-⚙️ Hardware & Tools
+⚙️ Hardware & Tools:
 FPGA Board: ZedBoard (Xilinx Zynq-7000 SoC)
 Design Tools: Vivado
 Languages: Verilog, TCL
 
-📊 Design Goals
+📊 Design Goals:
 Maximize compute throughput via parallel MAC operations
 Reduce memory bottlenecks through data reuse strategies
 Enable scalable architecture for larger workloads
 
-📁 Repository Structure
+📁 Repository Structure:
 /rtl/ – Verilog modules (PE, systolic array, control logic)
 /sim/ – Testbenches and simulation files
 /ip/ – Custom and integrated IP blocks
 
-🔍 Future Work
+🔍 Future Work:
 Support for larger matrices and batching along with matrix tiling
 Quantization-aware optimizations for neural network inference
 Performance benchmarking (throughput, latency, resource utilization)
+
+Note: This accelerator is still a work in progress but the key component which is the the systolic array has been completely designed with a few minor tweaks related to quantization of the data still in progress.
