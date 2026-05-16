@@ -1,8 +1,12 @@
 # Systolic-Array-Accelerator
 
-This project implements a scalable 20×20 systolic array accelerator on FPGA, designed for high-throughput matrix multiplication workloads typical in deep learning and signal processing applications.
+This project implements a parametrized Systolic Array Accelerator for FPGA platforms, designed for high-throughput MAC operations accelerating matrix multiplication workloads typical in deep learning and signal processing applications.
 
 The architecture adopts an output-stationary dataflow with diagonal wavefront scheduling, maximizing data reuse while minimizing memory bandwidth requirements. Each Processing Element (PE) performs multiple MAC operations and locally accumulates results, significantly reducing off-chip communication overhead.
+
+The design is specialised in batch processing and the batch size is determined by the size of the array initialised in the design. 
+
+The current design is implemented with an array size of 4x4 for simplicity. The size of the array which is initialsed can be easily modified by changing the **insts** parameter and reconfiguring the blocks in the block design accordingly.
 
 🔧 Key Features
 Custom Processing Elements (PEs) optimized for signed arithmetic and efficient accumulation
@@ -28,8 +32,10 @@ Enable scalable architecture for larger workloads
 /ip/ – Custom and integrated IP blocks
 
 🔍 Future Work:
-Support for larger matrices and batching along with matrix tiling
-Quantization-aware optimizations for neural network inference
-Performance benchmarking (throughput, latency, resource utilization)
-
-Note: This accelerator is still a work in progress but the key component which is the the systolic array has been completely designed with a few minor tweaks related to quantization of the data still in progress.
+Develop Processing System (PS) program in C.
+Emulate the FPGA using Vitis' hardware emulation feature to simulate both PS and PL.
+Calculate performance metrics in Emulation.
+Program FPGA and test with random test data.
+Develop an application in the host PC to send data over to the FPGA.
+Test the complete system.
+Modify the application to be capable of running any neural network.
