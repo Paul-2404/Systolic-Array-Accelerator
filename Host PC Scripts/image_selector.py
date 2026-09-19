@@ -1,3 +1,5 @@
+# This script is used to select the images that the user wants to classify and generate a .npy file in a (4,784) array 
+# The (4,784) array format is locked down for the design and must not be changed
 import os
 import math
 import tkinter as tk
