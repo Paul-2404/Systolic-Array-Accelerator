@@ -1,21 +1,21 @@
-/ ============================================================
-/  axi_systolic_wrapper.v                                     
-/                                                             
-/  AXI4-Lite slave wrapper around the Array module.           
-/                                                             
-/  MEMORY MAP (all offsets from S_AXI_BASEADDR):              
-/  -----------------------------------------------            
-/  0x0000  CTRL        [0]=start  [1]=rst_array               
-/  0x0004  STATUS      [0]=busy   [1]=done                    
-/  0x0008  BIAS        [7:0] bias value for this inference    
-/  0x000C  RESULT_CNT  how many results have been written to B
-/  0x0010  INPUT_PTR   [15:0] Base byte address for input_a   
-/  0x0014  WEIGHT_PTR  [15:0] Base byte address for input_b   
-/  0x0018  RESULT_PTR  [15:0] Base byte address for results   
-/  0x001C  NO_ADD      [15:0] Number of MAC operations (depth)
-/  0x0020  M_VAL       [31:0] Multiplier for quantization     
-/  0x0024  SHIFT_VAL   [7:0]  Shift amount for quantization   
-/ ============================================================
+// ============================================================
+//  axi_systolic_wrapper.v                                     
+//                                                             
+//  AXI4-Lite slave wrapper around the Array module.           
+//                                                             
+//  MEMORY MAP (all offsets from S_AXI_BASEADDR):              
+//  -----------------------------------------------            
+//  0x0000  CTRL        [0]=start  [1]=rst_array               
+//  0x0004  STATUS      [0]=busy   [1]=done                    
+//  0x0008  BIAS        [7:0] bias value for this inference    
+//  0x000C  RESULT_CNT  how many results have been written to B
+//  0x0010  INPUT_PTR   [31:0] Base byte address for input_a   
+//  0x0014  WEIGHT_PTR  [31:0] Base byte address for input_b   
+//  0x0018  RESULT_PTR  [31:0] Base byte address for results   
+//  0x001C  NO_ADD      [15:0] Number of MAC operations (depth)
+//  0x0020  M_VAL       [31:0] Multiplier for quantization     
+//  0x0024  SHIFT_VAL   [7:0]  Shift amount for quantization   
+// ============================================================
   
 module axi_systolic_wrapper #(
     parameter WIDTH      = 8,
@@ -57,13 +57,13 @@ reg        reg_busy;
 reg        reg_done;
 reg [15:0] reg_result_cnt;
 
-reg [15:0] reg_bias_ptr;
-reg [15:0] reg_input_ptr;
-reg [15:0] reg_weight_ptr;
-reg [15:0] reg_result_ptr;
+reg [31:0] reg_bias_ptr;
+reg [31:0] reg_input_ptr;
+reg [31:0] reg_weight_ptr;
+reg [31:0] reg_result_ptr;
 
 reg [15:0]          reg_no_add;
-reg [RES_WIDTH-1:0] reg_M;
+reg signed [RES_WIDTH-1:0] reg_M;
 reg [WIDTH-1:0]     reg_shift;
 
 localparam ADDR_CTRL       = 6'h00;
@@ -78,7 +78,7 @@ localparam ADDR_M_VAL      = 6'h20;
 localparam ADDR_SHIFT_VAL  = 6'h24;
 
 localparam TOTAL_RESULTS = INSTS * INSTS;
-localparam NUM_BIASES    = INSTS * INSTS;
+localparam NUM_BIASES    = INSTS;
 
 localparam IDLE      = 4'd0;
 localparam RD_BIAS_A = 4'd1;
@@ -165,7 +165,7 @@ always @(posedge S_AXI_ACLK) begin
         bram_en          <= 0;
         array_valid      <= 0;
         array_bias_valid <= 0;
-        reg_start        <= 0;
+        //reg_start        <= 0;
 
         case(feed_state)
 
@@ -254,40 +254,78 @@ always @(posedge S_AXI_ACLK) begin
             end
 
             WAIT: begin
-
                 if(array_result_valid) begin
+                feed_state <= COLLECT;
+                bram_en <= 1'b1;
 
-                    feed_state   <= COLLECT;
+                // Same 32-bit BRAM word for every group of 4 results
+                bram_addr <= reg_result_ptr + ((result_idx >> 2) << 2);
+                // Put the 8-bit result in the appropriate byte lane
+                
+                case(result_idx[1:0])
 
-                    bram_en      <= 1;
-                    bram_we      <= 4'b1111;
+                    2'd0: begin
+                        bram_we      <= 4'b0001;
+                        bram_wr_data <= {24'b0, array_result};
+                    end
 
-                    bram_addr    <= reg_result_ptr + (result_idx << 2);
+                    2'd1: begin
+                        bram_we      <= 4'b0010;
+                        bram_wr_data <= {16'b0, array_result, 8'b0};
+                    end
 
-                    bram_wr_data <= {{(32-WIDTH){1'b0}}, array_result};
+                    2'd2: begin
+                        bram_we      <= 4'b0100;
+                        bram_wr_data <= {8'b0, array_result, 16'b0};
+                    end
 
-                    result_idx   <= result_idx + 1;
-                    reg_result_cnt <= 1;
+                    2'd3: begin
+                        bram_we      <= 4'b1000;
+                        bram_wr_data <= {array_result, 24'b0};
+                    end
+                endcase
 
+                result_idx     <= result_idx + 1;
+                reg_result_cnt <= 1;
                 end
             end
-
+            
             COLLECT: begin
-
                 if(array_result_valid) begin
+                bram_en <= 1'b1;
 
-                    bram_en      <= 1;
-                    bram_we      <= 4'b1111;
+                // Four 8-bit results share one 32-bit BRAM word
+                bram_addr <= reg_result_ptr + ((result_idx >> 2) << 2);
 
-                    bram_addr    <= reg_result_ptr + (result_idx << 2);
+                case(result_idx[1:0])
 
-                    bram_wr_data <= {{(32-WIDTH){1'b0}}, array_result};
+                    2'd0: begin
+                        bram_we      <= 4'b0001;
+                        bram_wr_data <= {24'b0, array_result};
+                    end
 
-                    result_idx   <= result_idx + 1;
-                    reg_result_cnt <= result_idx + 1;
+                    2'd1: begin
+                        bram_we      <= 4'b0010;
+                        bram_wr_data <= {16'b0, array_result, 8'b0};
+                    end
 
-                    if(result_idx == TOTAL_RESULTS - 1)
-                        feed_state <= FINISHED;
+                    2'd2: begin
+                        bram_we      <= 4'b0100;
+                        bram_wr_data <= {8'b0, array_result, 16'b0};
+                    end
+
+                    2'd3: begin
+                        bram_we      <= 4'b1000;
+                        bram_wr_data <= {array_result, 24'b0};
+                    end
+
+                endcase
+
+                result_idx       <= result_idx + 1;
+                reg_result_cnt   <= result_idx + 1;
+
+                if(result_idx == TOTAL_RESULTS - 1)
+                    feed_state <= FINISHED;
 
                 end
             end
@@ -312,15 +350,17 @@ always @(posedge S_AXI_ACLK) begin
         S_AXI_BRESP    <= 2'b00;
         reg_start      <= 0;
         reg_rst_array  <= 0;
-        reg_bias_ptr   <= 16'h0800;
-        reg_input_ptr  <= 16'h0000;
-        reg_weight_ptr <= 16'h0C40;
-        reg_result_ptr <= 16'h1880;
+        reg_bias_ptr   <= 32'h0002_2000;
+        reg_input_ptr  <= 32'h0000_0000;
+        reg_weight_ptr <= 32'h0000_2000;
+        reg_result_ptr <= 32'h0000_1000;
         reg_no_add     <= 16'h0001; // Default to 1 to prevent underflow
         reg_M          <= 32'h0000_0001;
         reg_shift      <= 0;
     end
     else begin
+        if (feed_state == FINISHED) 
+            reg_start <= 0;
         if (S_AXI_AWVALID && S_AXI_WVALID && !S_AXI_AWREADY) begin
             S_AXI_AWREADY <= 1;
             S_AXI_WREADY  <= 1;
@@ -330,10 +370,10 @@ always @(posedge S_AXI_ACLK) begin
                     reg_start     <= S_AXI_WDATA[0];  
                     reg_rst_array <= S_AXI_WDATA[1];
                 end
-                ADDR_BIAS_PTR:   reg_bias_ptr   <= S_AXI_WDATA[15:0];
-                ADDR_INPUT_PTR:  reg_input_ptr  <= S_AXI_WDATA[15:0]; 
-                ADDR_WEIGHT_PTR: reg_weight_ptr <= S_AXI_WDATA[15:0]; 
-                ADDR_RESULT_PTR: reg_result_ptr <= S_AXI_WDATA[15:0]; 
+                ADDR_BIAS_PTR:   reg_bias_ptr   <= S_AXI_WDATA;
+                ADDR_INPUT_PTR:  reg_input_ptr  <= S_AXI_WDATA; 
+                ADDR_WEIGHT_PTR: reg_weight_ptr <= S_AXI_WDATA; 
+                ADDR_RESULT_PTR: reg_result_ptr <= S_AXI_WDATA; 
                 ADDR_NO_ADD:     reg_no_add     <= S_AXI_WDATA[15:0]; // [NEW]
                 ADDR_M_VAL:      reg_M          <= S_AXI_WDATA;       // [NEW]
                 ADDR_SHIFT_VAL:  reg_shift      <= S_AXI_WDATA[WIDTH-1:0]; // [NEW]
@@ -369,11 +409,11 @@ always @(posedge S_AXI_ACLK) begin
             case (S_AXI_ARADDR[5:0]) // [FIXED] Check against 6 bits now
                 ADDR_CTRL:       S_AXI_RDATA <= {30'b0, reg_rst_array, reg_start};
                 ADDR_STATUS:     S_AXI_RDATA <= {30'b0, reg_done, reg_busy};
-                ADDR_BIAS_PTR:   S_AXI_RDATA <= {16'b0, reg_bias_ptr};
+                ADDR_BIAS_PTR:   S_AXI_RDATA <= reg_bias_ptr;
                 ADDR_RESULT_CNT: S_AXI_RDATA <= {16'b0, reg_result_cnt};
-                ADDR_INPUT_PTR:  S_AXI_RDATA <= {16'b0, reg_input_ptr};  
-                ADDR_WEIGHT_PTR: S_AXI_RDATA <= {16'b0, reg_weight_ptr}; 
-                ADDR_RESULT_PTR: S_AXI_RDATA <= {16'b0, reg_result_ptr}; 
+                ADDR_INPUT_PTR:  S_AXI_RDATA <= reg_input_ptr;  
+                ADDR_WEIGHT_PTR: S_AXI_RDATA <= reg_weight_ptr; 
+                ADDR_RESULT_PTR: S_AXI_RDATA <= reg_result_ptr; 
                 ADDR_NO_ADD:     S_AXI_RDATA <= {16'b0, reg_no_add};     // [NEW]
                 ADDR_M_VAL:      S_AXI_RDATA <= reg_M;                   // [NEW]
                 ADDR_SHIFT_VAL:  S_AXI_RDATA <= {{(32-WIDTH){1'b0}}, reg_shift}; // [NEW]
