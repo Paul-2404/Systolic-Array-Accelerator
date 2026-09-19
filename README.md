@@ -29,13 +29,7 @@ Enable scalable architecture for larger workloads
 📁 Repository Structure:
 /rtl/ – Verilog modules (PE, systolic array, control logic)
 /sim/ – Testbenches and simulation files
-/ip/ – Custom and integrated IP blocks
+/Host PC Scripts/ - Python scripts necessary for NN and value generation 
 
 🔍 Future Work:
-Develop Processing System (PS) program in C.
-Emulate the FPGA using Vitis' hardware emulation feature to simulate both PS and PL.
-Calculate performance metrics in Emulation.
-Program FPGA and test with random test data.
-Develop an application in the host PC to send data over to the FPGA.
-Test the complete system.
-Modify the application to be capable of running any neural network.
+Try running other larger networks apart from MNIST Classifier
