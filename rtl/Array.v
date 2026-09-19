@@ -15,10 +15,10 @@ module Array #(
     input wire signed [res_width-1:0] bias,
     input wire bias_valid, 
     
-    input wire [res_width-1:0] M,
+    input wire signed [res_width-1:0] M,
     input wire [width-1:0] shift,
     output reg signed [width-1:0] result,
-    output reg result_valid
+    (* mark_debug = "true" *) output reg result_valid
 );
 
 wire signed [width-1:0] a_bus [0:insts-1][0:insts-1];
@@ -127,7 +127,7 @@ endgenerate
 
 integer m;
 integer n;
-reg signed [res_width-1:0] bias_reg [0:insts-1][0:insts-1];
+reg signed [res_width-1:0] bias_reg [0:insts-1];
 
 // ------------------------------------------------------------
 // Result Storage and Serial Bias Shift Register
@@ -135,37 +135,24 @@ reg signed [res_width-1:0] bias_reg [0:insts-1][0:insts-1];
 always @(posedge clk) begin
     if (rst) begin
         for(m=0; m<insts; m=m+1) begin
+            bias_reg[m]   <= 0;
             for(n=0; n<insts; n=n+1) begin
                 result_reg[m][n] <= 0;
-                bias_reg[m][n]   <= 0;
             end
         end
     end     
     else begin
-        // Constantly store computational results
         for(m=0; m<insts; m=m+1) begin
             for(n=0; n<insts; n=n+1) begin
                 result_reg[m][n] <= result_bus[m][n];
             end
         end
         
-        // Daisy-chain shift register for loading biases
         if (bias_valid) begin
-            // The newest bias enters at the very last register in the array
-            bias_reg[insts-1][insts-1] <= bias;
+            bias_reg[insts-1] <= bias;
             
-            for(m=0; m<insts; m=m+1) begin
-                for(n=0; n<insts; n=n+1) begin
-                    if (m == insts-1 && n == insts-1) begin
-                        // Handled above (entry point)
-                    end else if (n == insts-1) begin
-                        // The last element of a row pulls from the first element of the NEXT row
-                        bias_reg[m][n] <= bias_reg[m+1][0];
-                    end else begin
-                        // Shift "left" across the columns in the same row
-                        bias_reg[m][n] <= bias_reg[m][n+1];
-                    end
-                end
+            for(m=0; m<insts-1; m=m+1) begin
+               bias_reg[m] <= bias_reg[m+1];
             end
         end
     end
@@ -177,7 +164,7 @@ localparam DRAIN   = 1'b1;
 reg state;
 reg reading_done; 
 reg valid_pipe_1;
-reg [res_width-1:0] M_reg;
+reg signed [res_width-1:0] M_reg;
 reg [width-1:0] shift_reg;
 reg signed [(res_width*2)-1:0] scaled;
 reg signed [res_width-1:0] shifted;
@@ -222,19 +209,19 @@ always @(posedge clk) begin
             DRAIN: begin
                 if (!reading_done) begin
                     // Add the locally stored bias during the drain state
-                    intr <= result_reg[row][col] + bias_reg[row][col];
+                    intr <= result_reg[row][col] + bias_reg[col];
                     valid_pipe_1 <= 1'b1;
                     
-                    if (col == insts-1) begin
-                        col <= 0;
-                        if (row == insts-1) begin
-                            row <= 0;
+                    if (row == insts-1) begin
+                        row <= 0;
+                        if (col == insts-1) begin
+                            col <= 0;
                             reading_done <= 1'b1; 
                         end else begin
-                            row <= row + 1;
+                            col <= col + 1;
                         end
                     end else begin
-                        col <= col + 1;
+                        row <= row + 1;
                     end
                 end else begin
                     valid_pipe_1 <= 1'b0; 
