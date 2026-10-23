@@ -1,3 +1,13 @@
+# This file is the main program to access the accelerator on the FPGA.
+# Run the host PC scripts first to generate the neural network parameters and transfer the generated quantized_network folder onto the FPGA.
+# Upload this file in the quantized_network folder on the FPGA.
+# This file should be uploaded to the FPGA along with the bitstream and hardware handoff files generated from Vivado.
+# After all the files are uploaded onto the FPGA you can run the program.
+
+###########################################
+# This file only works for the Pynq ZU FPGA Board and not any other SOC FPGAs.
+# Modifications are needed to run this on other SOC FPGAs.
+###########################################
 import time
 import os
 import numpy as np
