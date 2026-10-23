@@ -17,9 +17,9 @@ Parameterizable design for scalability across different array sizes and bit-widt
 AXI-based memory interfacing for integration with processing systems (PS)
 
 ⚙️ Hardware & Tools:
-FPGA Board: ZedBoard (Xilinx Zynq-7000 SoC)
+FPGA Board: Pynq ZU (Xilinx Ultrascale MP+SoC)
 Design Tools: Vivado
-Languages: Verilog, TCL
+Languages: Verilog, SystemVerilog, python
 
 📊 Design Goals:
 Maximize compute throughput via parallel MAC operations
@@ -30,6 +30,17 @@ Enable scalable architecture for larger workloads
 /rtl/ – Verilog modules (PE, systolic array, control logic)
 /sim/ – Testbenches and simulation files
 /Host PC Scripts/ - Python scripts necessary for NN and value generation 
+/main.py/ - Main program to run on the FPGA
 
 🔍 Future Work:
 Try running other larger networks apart from MNIST Classifier
+Optimising the main.py to reduce software overhead 
+
+Below is a step by step guide on how to implement this project:
+1. Use the rtl and sim folders to design and verify the systolic array accelerator's designs.
+2. Design and dataflow changes can be made easily to match the user's requirement.
+3. Use the Block Design PNG as a reference for your own BD.
+4. Copy the Host PC Scripts folder and run the NN.py and image_selector.py respectively.
+5. After the quantized_network folder is generated, copy the folder along with the main.py and bitstream and hardware handoff files onto the FPGA.
+6. Make sure the main.py, .bit and .hwh files are present inside the quantized_network folder on the FPGA.
+7. Run the main.py.
